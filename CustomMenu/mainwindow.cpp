@@ -59,29 +59,37 @@ void MainWindow::customActions()
 
 void MainWindow::loadMenu()
 {
+    //这里以顶部为自定义区域，
     QMenu menu;
-    QList<QAction *> tempActs;
     if(m_addCustom){
-        loadCompositeCustom(tempActs);
-        tempActs = tempActs + m_defaultActs;
-    }else {
-        tempActs = m_defaultActs;
+        loadCompositeCustom(menu);
     }
-    for (const auto act : tempActs) {
+    for (const auto act : m_defaultActs) {
         menu.addAction(act);
-        menu.addSeparator();
     }
     QPoint t_tmpPoint = QCursor::pos();
     menu.popup(t_tmpPoint);
     menu.exec();
 }
 
-void MainWindow::loadCompositeCustom(QList<QAction *> &customActs)
+void MainWindow::loadCompositeCustom(QMenu &tempMenu)
 {
     auto tempEntry = m_parser->getActionFiles();
     for (const auto &temp : tempEntry) {
+        //top
+        auto separator = temp.data().separator();
+        //上分割线
+        if (separator & DCustomActionDefines::Top) {
+            tempMenu.addSeparator();
+        }
+        //add action
         QAction *tempAction = new QAction(temp.data().name());
-        customActs.append(tempAction);
+        tempMenu.addAction(tempAction);
+
+        //bottom
+        if (separator & DCustomActionDefines::Bottom) {
+            tempMenu.addSeparator();
+        }
     }
 }
 

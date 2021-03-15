@@ -27,7 +27,7 @@ private:
     void defaultAcitons();
     void customActions();
     void loadMenu();
-    void loadCompositeCustom(QList<QAction *> &customActs);
+    void loadCompositeCustom(QMenu &tempMenu);
     void loadDefaultMenu();
 
 

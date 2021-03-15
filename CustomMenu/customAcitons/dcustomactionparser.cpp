@@ -4,7 +4,7 @@
 #include <QDebug>
 #include <QSettings>
 #include <QFileSystemWatcher>
-
+#include <QCoreApplication>
 
 using namespace DCustomActionDefines;
 
@@ -14,12 +14,13 @@ DCustomActionParser::DCustomActionParser(bool onDesktop, QObject *parent)
 {
     m_fileWatcher = new QFileSystemWatcher;
     //监听目录
-    m_fileWatcher->addPath(kCustomMenuPath);
+    auto tempPath =  QCoreApplication::applicationDirPath() + "/CustomFile";
+    m_fileWatcher->addPath(tempPath);
     connect(m_fileWatcher, &QFileSystemWatcher::directoryChanged, this, &DCustomActionParser::delayRefresh);
     connect(m_fileWatcher, &QFileSystemWatcher::fileChanged, this, &DCustomActionParser::delayRefresh);
 
     initHash();
-    loadDir(kCustomMenuPath);
+    loadDir(tempPath);
     //暂时不考虑效率，todo后续优化考虑开线程处理此loadDir
 }
 
@@ -425,7 +426,8 @@ void DCustomActionParser::delayRefresh()
         m_actionEntry.clear();
 
         qInfo() << "loading custom menus" << this;
-        loadDir(kCustomMenuPath);
+        auto tempPath =  QCoreApplication::applicationDirPath() + "/CustomFile";
+        loadDir(tempPath);
 
         m_refreshTimer->stop();
         m_refreshTimer->deleteLater();

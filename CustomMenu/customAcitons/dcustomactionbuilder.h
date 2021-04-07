@@ -1,9 +1,10 @@
 /*
- * Copyright (C) 2019 ~ 2019 Deepin Technology Co., Ltd.
+ * Copyright (C) 2020 ~ 2021 Uniontech Software Technology Co., Ltd.
  *
- * Author:     zhangyu <zhangyub@uniontech.com>
+ * Author:     zhangyu<zhangyub@uniontech.com>
  *
- * Maintainer: zhangyu <zhangyub@uniontech.com>
+ * Maintainer: zhangyu<zhangyub@uniontech.com>
+ *             liqiang<liqianga@uniontech.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,6 +26,7 @@
 #include "dcustomactiondata.h"
 #include "durl.h"
 #include "interfaces/dfileservices.h"
+#include "dmimedatabase.h"
 
 #include <QObject>
 #include <QIcon>
@@ -40,6 +42,7 @@ public:
     QAction *buildAciton(const DCustomActionData &actionData, QWidget *parentForSubmenu) const;
     void setActiveDir(const DUrl &dir);
     void setFocusFile(const DUrl &file);
+    QString getCompleteSuffix(const QString & fileName, const QString &suf);
     static DCustomActionDefines::ComboType checkFileCombo(const DUrlList &files);
     static QList<DCustomActionEntry> matchFileCombo(const QList<DCustomActionEntry> &rootActions,
                                                     DCustomActionDefines::ComboTypes type);
@@ -72,6 +75,7 @@ private:
     QString m_fileBaseName;
     QString m_fileFullName;
     DUrl m_filePath;
+    DMimeDatabase mimeDatabase;
 };
 
 #endif // DCUSTOMACTIONBUILDER_H

@@ -28,6 +28,7 @@ private:
     void customActions();
     void loadMenu();
     void loadCompositeCustom(QMenu &tempMenu);
+    void loadCustomAction(QAction *tempAc, const DCustomActionData &tempActData);
     void loadDefaultMenu();
 
 

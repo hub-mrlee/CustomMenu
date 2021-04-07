@@ -1,3 +1,25 @@
+/*
+ * Copyright (C) 2020 ~ 2021 Uniontech Software Technology Co., Ltd.
+ *
+ * Author:     zhangyu<zhangyub@uniontech.com>
+ *
+ * Maintainer: zhangyu<zhangyub@uniontech.com>
+ *             liqiang<liqianga@uniontech.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include "dcustomactionbuilder.h"
 #include "dfilemenu.h"
 
@@ -58,12 +80,49 @@ void DCustomActionBuilder::setFocusFile(const DUrl &file)
     auto info = DFileService::instance()->createFileInfo(nullptr, file);
     if (info) {
         m_fileFullName = info->fileName();
-        m_fileBaseName = info->baseName();
+        //baseName
+        if (info->isDir()) {
+            m_fileBaseName = m_fileFullName;
+            return;
+        }
+        //fix bug 65159,这里只针对一些常见的后缀处理，暂不针对一些非标准的特殊情况做处理,待后续产品有特殊要求再处理特殊情况
+        //suffixForFileName对复式后缀会返回xx.*,比如test.7z.001返回的是7z.*
+        //不过在一些非标准的复式后缀判定中，仍可能判定不准确：比如：test.part1.rar被识别成rar
+        //隐藏文件：".tar"、".tar.gz"后缀识别成""和".gz"
+        //可能无法识别到后缀：如test.run或者.tar
+        QString suffix = mimeDatabase.suffixForFileName(m_fileFullName);
+        if (suffix.isEmpty()) {
+            m_fileBaseName = m_fileFullName;
+            return;
+        }
+        //二次过滤后缀，方式识别到分卷带*的情况
+        suffix = this->getCompleteSuffix(m_fileFullName, suffix);
+        m_fileBaseName = m_fileFullName.left(m_fileFullName.length() - suffix.length() - 1);
 
         //解决 .xx 一类的隐藏文件
         if (m_fileBaseName.isEmpty())
             m_fileBaseName = m_fileFullName;
     }
+}
+
+/*!
+    过滤识别结果带*的情况，返回当前文件名的实际全后缀(已经经过DMimeDatabase识别后且为复式后缀后使用)。
+    检查 \a fileName 待划分后缀的全文件名， \a suf 经过DMimeDatabase识别后的复式后缀。
+ */
+QString DCustomActionBuilder::getCompleteSuffix(const QString &fileName, const QString &suf)
+{
+    QString tempStr;
+    if (!suf.contains(".") || suf.isEmpty())
+        return suf;
+    auto sufLst = suf.split(".");
+    if (0 < sufLst.size()) {
+        tempStr = sufLst.first();
+        int index = fileName.lastIndexOf(tempStr);
+        if (index > 0) {
+            return fileName.mid(index);;
+        }
+    }
+    return suf;
 }
 
 /*!
@@ -183,6 +242,13 @@ QList<DCustomActionEntry> DCustomActionBuilder::matchActions(const DUrlList &sel
             QStringList supportMimeTypes =  tempAction.mimeTypes();
             supportMimeTypes.removeAll({});
             auto match = isMimeTypeMatch(fileMimeTypes, supportMimeTypes);
+
+//在自定义右键菜中有作用域限制，此类情况不显示自定义菜单，故可屏蔽，若后续有作用域的调整再考虑是否开放
+#if 0
+            //部分mtp挂载设备目录下文件属性不符合规范(普通目录mimetype被认为是octet-stream)，暂时做特殊处理-
+            if (singleUrl.path().contains("/mtp:host") && supportMimeTypes.contains("application/octet-stream") && fileMimeTypes.contains("application/octet-stream"))
+                match = false;
+#endif
             if (!match) {
                 it = oriActions.erase(it);
                 continue;

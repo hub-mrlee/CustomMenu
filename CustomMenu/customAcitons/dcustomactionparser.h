@@ -1,9 +1,10 @@
 /*
- * Copyright (C) 2019 ~ 2019 Deepin Technology Co., Ltd.
+ * Copyright (C) 2020 ~ 2021 Uniontech Software Technology Co., Ltd.
  *
- * Author:     liqiang <liqianga@uniontech.com>
+ * Author:     liqiang<liqianga@uniontech.com>
  *
- * Maintainer: liqiang <liqianga@uniontech.com>
+ * Maintainer: liqiang<liqianga@uniontech.com>
+ *             zhangyu<zhangyub@uniontech.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,18 +28,31 @@
 #include <QObject>
 #include <QHash>
 #include <QTimer>
+#include <QIODevice>
+#include <QSettings>
 
-class QSettings;
 class QFileSystemWatcher;
+class RegisterCustomFormat
+{
+public:
+    static RegisterCustomFormat& instance();
+    QSettings::Format customFormat();
+private:
+    RegisterCustomFormat();
+    static bool readConf(QIODevice &device, QSettings::SettingsMap &settingsMap);
+    static bool writeConf(QIODevice &device, const QSettings::SettingsMap &settingsMap);
+private:
+    QSettings::Format m_customFormat;
+};
 class DCustomActionParser : public QObject
 {
     Q_OBJECT
 public:
-    explicit DCustomActionParser(bool onDesktop, QObject *parent = nullptr);
+    explicit DCustomActionParser(QObject *parent = nullptr);
     ~DCustomActionParser();
 
     bool loadDir(const QString &dirPath);
-    QList<DCustomActionEntry> getActionFiles();
+    QList<DCustomActionEntry> getActionFiles(bool onDesktop);
 
     bool parseFile(QSettings &actionSetting);
     bool parseFile(QList<DCustomActionData> &childrenActions
@@ -66,13 +80,13 @@ private:
     QTimer *m_refreshTimer = nullptr;
     QFileSystemWatcher  *m_fileWatcher  = nullptr;
     QList<DCustomActionEntry> m_actionEntry;
+    QSettings::Format m_customFormat;
     QHash<QString, DCustomActionDefines::ComboType> m_combos;
     QHash<QString, DCustomActionDefines::Separator> m_separtor;
     QHash<QString, DCustomActionDefines::ActionArg> m_actionNameArg;
     QHash<QString, DCustomActionDefines::ActionArg> m_actionExecArg;
     int m_hierarchyNum = 0;
     int m_topActionCount = 0;
-    bool m_onDesktop;
 };
 
 #endif // DCUSTOMACTIONPARSER_H

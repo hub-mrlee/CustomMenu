@@ -1,26 +1,116 @@
+/*
+ * Copyright (C) 2020 ~ 2021 Uniontech Software Technology Co., Ltd.
+ *
+ * Author:     zhangyu<zhangyub@uniontech.com>
+ *
+ * Maintainer: zhangyu<zhangyub@uniontech.com>
+ *             liqiang<liqianga@uniontech.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include "dcustomactionparser.h"
 
 #include <QDir>
 #include <QDebug>
 #include <QSettings>
 #include <QFileSystemWatcher>
-#include <QCoreApplication>
 
 using namespace DCustomActionDefines;
 
-DCustomActionParser::DCustomActionParser(bool onDesktop, QObject *parent)
-    : QObject(parent)
-    , m_onDesktop(onDesktop)
+/*!
+ * \brief 自定义配置文件读规则
+ * \param device 读取io
+ * \param settingsMap 保存读取结果
+ * \return
+ */
+bool RegisterCustomFormat::readConf(QIODevice &device, QSettings::SettingsMap &settingsMap)
 {
+    QString section;
+    QTextStream stream(&device);
+    bool prefixExists = false;
+    while (!stream.atEnd()) {
+        QString line = stream.readLine().trimmed();
+
+        // 跳过备注
+        if (line.startsWith(QLatin1Char('#')))
+            continue;
+        // 分组
+        if (line.startsWith(QLatin1Char('[')) && line.endsWith(QLatin1Char(']')))
+        {
+            section = line.mid(1, line.length()-2);
+            if (section == kMenuPrefix)
+                prefixExists = true;
+            continue;
+        }
+
+        QString key = line.section(QLatin1Char('='), 0, 0).trimmed();
+        QString value = line.section(QLatin1Char('='), 1).trimmed();
+
+        if (key.isEmpty())
+            continue;
+        settingsMap[section + QLatin1Char('/') + key] = QVariant(value);
+    }
+    return prefixExists;
+}
+
+/*!
+ * \brief 自定义配置文件写规则
+ * \param device
+ * \param settingsMap
+ * \return
+ */
+bool RegisterCustomFormat::writeConf(QIODevice &device, const QSettings::SettingsMap &settingsMap)
+{
+    Q_UNUSED(device)
+    Q_UNUSED(settingsMap)
+    return true;
+}
+
+/*!
+ * \brief 注册自定义qsettings读取规则
+ */
+RegisterCustomFormat &RegisterCustomFormat::instance()
+{
+    static RegisterCustomFormat instance;
+    return instance;
+}
+
+QSettings::Format RegisterCustomFormat::customFormat()
+{
+    return m_customFormat;
+}
+
+RegisterCustomFormat::RegisterCustomFormat()
+{
+    //注册读写规则
+    m_customFormat = QSettings::registerFormat("conf", &RegisterCustomFormat::readConf, &RegisterCustomFormat::writeConf);
+}
+
+DCustomActionParser::DCustomActionParser(QObject *parent)
+    : QObject(parent)
+{
+    //获取注册的自定义方式
+    m_customFormat = RegisterCustomFormat::instance().customFormat();
     m_fileWatcher = new QFileSystemWatcher;
     //监听目录
-    auto tempPath =  QCoreApplication::applicationDirPath() + "/CustomFile";
-    m_fileWatcher->addPath(tempPath);
+    m_fileWatcher->addPath(kCustomMenuPath);
     connect(m_fileWatcher, &QFileSystemWatcher::directoryChanged, this, &DCustomActionParser::delayRefresh);
     connect(m_fileWatcher, &QFileSystemWatcher::fileChanged, this, &DCustomActionParser::delayRefresh);
 
     initHash();
-    loadDir(tempPath);
+    loadDir(kCustomMenuPath);
     //暂时不考虑效率，todo后续优化考虑开线程处理此loadDir
 }
 
@@ -54,7 +144,7 @@ bool DCustomActionParser::loadDir(const QString &dirPath)
         m_fileWatcher->addPath(actionFileInfo.absoluteFilePath());
 
         //解析文件字段
-        QSettings actionSetting(actionFileInfo.filePath(), QSettings::IniFormat);
+        QSettings actionSetting(actionFileInfo.filePath(), m_customFormat);
         actionSetting.setIniCodec("UTF-8");
         parseFile(actionSetting);
     }
@@ -62,11 +152,19 @@ bool DCustomActionParser::loadDir(const QString &dirPath)
 }
 
 /*!
-    返回值QList<DCustomActionEntry>，返回加载解析的菜单项
+    返回值QList<DCustomActionEntry>，返回加载解析的菜单项.
+    \a onDesktop 匹配是否不再桌面/文管显示
 */
-QList<DCustomActionEntry> DCustomActionParser::getActionFiles()
+QList<DCustomActionEntry> DCustomActionParser::getActionFiles(bool onDesktop)
 {
-    return m_actionEntry;
+    QList<DCustomActionEntry> ret;
+    foreach (const DCustomActionEntry &entry, m_actionEntry) {
+        //NotShowIn
+        if (isActionShouldShow(entry.m_notShowIn, onDesktop))
+            ret << entry;//一级菜单不在桌面/文管显示则跳过该项
+    }
+
+    return ret;
 }
 
 /*!
@@ -255,10 +353,6 @@ bool DCustomActionParser::parseFile(QList<DCustomActionData> &childrenActions, Q
         if (!comboPosForTopAction(actionSetting, group, actData))
             return false;//有一级菜单项支持的类型，但全无效，自动作为无效废弃项
 
-        //NotShowIn
-        if (!isActionShouldShow(tpEntry.m_notShowIn, m_onDesktop))
-            return false;//一级菜单不在桌面/文管显示则跳过该项
-
         tpEntry.m_package = basicInfos.m_package;
         tpEntry.m_version = basicInfos.m_version;
         tpEntry.m_comment = basicInfos.m_comment;
@@ -426,8 +520,7 @@ void DCustomActionParser::delayRefresh()
         m_actionEntry.clear();
 
         qInfo() << "loading custom menus" << this;
-        auto tempPath =  QCoreApplication::applicationDirPath() + "/CustomFile";
-        loadDir(tempPath);
+        loadDir(kCustomMenuPath);
 
         m_refreshTimer->stop();
         m_refreshTimer->deleteLater();

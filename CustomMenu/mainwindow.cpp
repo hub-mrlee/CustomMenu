@@ -27,7 +27,7 @@ void MainWindow::contextMenuEvent(QContextMenuEvent *event)
 
 void MainWindow::init()
 {
-    m_parser = new DCustomActionParser(false, nullptr);
+    m_parser = new DCustomActionParser(nullptr);
     defaultAcitons();
 
     m_customPath =  QCoreApplication::applicationDirPath() + "/CustomFile";
@@ -74,7 +74,7 @@ void MainWindow::loadMenu()
 
 void MainWindow::loadCompositeCustom(QMenu &tempMenu)
 {
-    auto tempEntry = m_parser->getActionFiles();
+    auto tempEntry = m_parser->getActionFiles(true);
     for (const auto &temp : tempEntry) {
         //top
         auto separator = temp.data().separator();
@@ -82,15 +82,45 @@ void MainWindow::loadCompositeCustom(QMenu &tempMenu)
         if (separator & DCustomActionDefines::Top) {
             tempMenu.addSeparator();
         }
+
         //add action
-        QAction *tempAction = new QAction(temp.data().name());
-        tempMenu.addAction(tempAction);
+        QAction *tempAct = new QAction(temp.data().name());
+        tempMenu.addAction(tempAct);
 
         //bottom
         if (separator & DCustomActionDefines::Bottom) {
             tempMenu.addSeparator();
         }
+        if (temp.data().acitons().size() > 0)
+            loadCustomAction(tempAct, temp.data());
     }
+}
+
+void MainWindow::loadCustomAction(QAction *tempAc, const DCustomActionData &tempActData)
+{
+     QMenu *tpMenu = new QMenu (this) ;
+    auto acts = tempActData.acitons();
+
+    for (const auto &temp : acts) {
+        //top
+        auto separator = temp.separator();
+        //上分割线
+        if (separator & DCustomActionDefines::Top) {
+            tpMenu->addSeparator();
+        }
+        //add action
+        QAction *tempAct = new QAction(temp.name());
+        tpMenu->addAction(tempAct);
+
+        //bottom
+        if (separator & DCustomActionDefines::Bottom) {
+            tpMenu->addSeparator();
+        }
+        if (temp.acitons().size() > 0)
+            loadCustomAction(tempAct, temp);
+    }
+
+    tempAc->setMenu(tpMenu);
 }
 
 void MainWindow::loadDefaultMenu()
